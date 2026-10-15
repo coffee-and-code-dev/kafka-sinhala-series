@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: kafka-springboot-ep5
+
+  kafka:
+    # All 3 brokers. If one is down, the client can still find the cluster through the others.
+    bootstrap-servers: localhost:9092,localhost:9094,localhost:9096
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # The safe producer: wait for all in-sync replicas + no duplicates on retry.
+      # Both are already the defaults since Kafka 3.0 - written here to be explicit.
+      acks: all
+      properties:
+        enable.idempotence: true
+
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+    # In-memory database for the outbox demo (it starts empty every time the app starts)
+    datasource:
+      url: jdbc:h2:mem:coffeedb;DB_CLOSE_DELAY=-1
+      username: sa
+      password:
+    jpa:
+      open-in-view: false
+      hibernate:
+        ddl-auto: create-drop
+
+  logging:
+    level:
+      org.apache.kafka: WARN
+      # Hides the "connection to node 2 could not be established" spam while brokers are stopped
+      org.apache.kafka.clients.NetworkClient: ERROR
