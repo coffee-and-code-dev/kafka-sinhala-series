@@ -1,0 +1,56 @@
+### ===== PART 1: acks (stop/start brokers between these - see README) =====
+
+### 1. acks=all
+POST http://localhost:8080/api/acks/all?message=hello-all
+
+### 2. acks=1
+POST http://localhost:8080/api/acks/1?message=hello-one
+
+### 3. acks=0 (offset will be -1)
+POST http://localhost:8080/api/acks/0?message=hello-zero
+
+
+### ===== PART 2: hot partitions =====
+
+### 4. Clear the stats
+DELETE http://localhost:8080/api/page-views/stats
+
+### 5. 500 page views, 80% from big-merchant -> one hot partition
+POST http://localhost:8080/api/page-views?count=500&salted=false
+
+### 6. Processed so far, per partition (run it a few times)
+GET http://localhost:8080/api/page-views/stats
+
+### 7. Same traffic, but with key salting
+POST http://localhost:8080/api/page-views?count=500&salted=true
+
+
+### ===== PART 3: dual write vs outbox =====
+
+### 8. Dual write + crash -> Kafka event sent, DB rolled back = GHOST event
+POST http://localhost:8080/api/payments/dual-write?fail=true
+Content-Type: application/json
+
+{"customerId":"cust-1","amount":5000}
+
+### 9. Payments in the DB (the ghost payment is NOT here)
+GET http://localhost:8080/api/payments
+
+### 10. Outbox + crash -> nothing saved, nothing sent
+POST http://localhost:8080/api/payments?fail=true
+Content-Type: application/json
+
+{"customerId":"cust-1","amount":5000}
+
+### 11. Outbox happy path -> relay publishes within 2 seconds
+POST http://localhost:8080/api/payments
+Content-Type: application/json
+
+{"customerId":"cust-2","amount":12500}
+
+### 12. Outbox table (look at publishedAt)
+GET http://localhost:8080/api/outbox
+
+### 13. Send the same event again -> consumer skips the DUPLICATE
+### Copy an "id" from request #12 into the URL
+POST http://localhost:8080/api/outbox/PASTE-EVENT-ID-HERE/republish
